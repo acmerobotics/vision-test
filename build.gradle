@@ -1,0 +1,42 @@
+plugins {
+	id 'com.github.johnrengelman.shadow' version '1.2.3'
+}
+	
+apply plugin: 'java'
+apply plugin: 'eclipse'
+
+repositories {
+	jcenter()
+	flatDir {
+		dirs 'lib'
+	}
+}
+
+shadowJar {
+	baseName = 'visionTest'
+	classifier = null
+	version = null
+	manifest {
+		attributes 'Main-Class': 'com.acmerobotics.library.vision.BeaconTest'
+	}
+}
+
+eclipse {
+	classpath { 
+		file {
+			whenMerged {
+				for (entry in getEntries()) {
+					if (entry.getPath().contains("opencv")) {
+						entry.setNativeLibraryLocation("visionTest/lib/x64")
+					}
+				}
+			}
+		}
+	}
+}
+
+dependencies {
+	compile (name: 'opencv-310', ext: 'jar')
+
+	testCompile 'junit:junit:4.12'
+}
