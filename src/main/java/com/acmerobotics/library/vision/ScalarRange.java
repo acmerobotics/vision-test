@@ -3,6 +3,9 @@ package com.acmerobotics.library.vision;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.opencv.core.Core;
+import org.opencv.core.CvType;
+import org.opencv.core.Mat;
 import org.opencv.core.Scalar;
 
 public class ScalarRange {
@@ -48,6 +51,16 @@ public class ScalarRange {
 			if (inside) return true;
 		}
 		return false;
+	}
+	
+	public Mat inRange(Mat src) {
+		Mat dest = Mat.zeros(src.size(), CvType.CV_8U);
+		Mat mask = new Mat(src.size(), CvType.CV_8U);
+		for (int i = 0; i < ranges.size(); i += 2) {
+			Core.inRange(src, ranges.get(i), ranges.get(i + 1), mask);
+			Core.bitwise_or(dest, mask, dest);
+		}
+		return dest;
 	}
 	
 }

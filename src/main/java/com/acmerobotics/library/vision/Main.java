@@ -80,16 +80,15 @@ public class Main {
 				int width = original.width(), height = original.height();
 				Mat resized = new Mat();
 				Imgproc.resize(original, resized, new Size(IMAGE_WIDTH, (height * IMAGE_WIDTH) / width));
-				Mat[] outputs = Beacon.processBeacon(resized);
-				for (int i = 0; i < outputs.length; i++) {
-					Mat output = outputs[i];
-					String[] parts = input.getName().split("\\.");
-					File outputFile = new File(outputDir.getPath() + "\\" + parts[0] + (i > 0 ? "_" + i : "") + "." + parts[1].toLowerCase());
-					Imgcodecs.imwrite(outputFile.getPath(), output);
-					System.out.print(input.getPath() + "@" + width + "x" + height);
-					System.out.print(" => ");
-					System.out.println(outputFile.getPath() + "@" + output.width() + "x" + output.height());
-				}
+				long start = System.currentTimeMillis();
+				Beacon.processBeacon(resized);
+				long stop = System.currentTimeMillis();
+				File outputFile = new File(outputDir.getPath() + "\\" + input.getName());
+				Imgcodecs.imwrite(outputFile.getPath(), resized);
+				System.out.print(input.getPath() + "@" + width + "x" + height);
+				System.out.print(" => ");
+				System.out.print(outputFile.getPath() + "@" + resized.width() + "x" + resized.height());
+				System.out.println(" (" + (stop - start) + "ms)");
 			}
 		}
 	}

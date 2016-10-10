@@ -12,8 +12,11 @@ repositories {
 	}
 }
 
+targetCompatibility = '1.7'
+sourceCompatibility = '1.7'
+
 shadowJar {
-	baseName = 'visionTest'
+	baseName = 'visionTest-full'
 	classifier = null
 	version = null
 	manifest {
