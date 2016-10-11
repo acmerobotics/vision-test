@@ -13,12 +13,12 @@ public class ColorDetector {
 	
 	public ScalarRange range;
 	
-	private List<MatOfPoint> contours;
+	private List<ColorRegion> regions;
 	private Mat mask;
 	
 	public ColorDetector(ScalarRange range) {
 		this.range = range;
-		this.contours = null;
+		this.regions = null;
 		this.mask = new Mat();
 	}
 	
@@ -45,13 +45,18 @@ public class ColorDetector {
 		
 		Core.bitwise_and(gray, mask, gray);
 		
-		this.contours = new ArrayList<MatOfPoint>();
+		List<MatOfPoint> contours = new ArrayList<MatOfPoint>();
 		Imgproc.findContours(gray, contours, new Mat(), Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE);
+		
+		regions = new ArrayList<ColorRegion>();
+		for (MatOfPoint contour : contours) {
+			regions.add(new ColorRegion(contour));
+		}
 		
 	}
 	
-	public List<MatOfPoint> getContours() {
-		return contours;
+	public List<ColorRegion> getContours() {
+		return regions;
 	}
 	
 	public void clipRegion(Mat src, Mat dest) {
