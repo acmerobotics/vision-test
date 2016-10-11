@@ -49,7 +49,7 @@ public class ColorRegion {
 	}
 	
 	public void drawBounds(Mat image, Scalar color, int thickness) {
-		Imgproc.rectangle(image, new Point(rect.x, rect.y), new Point(rect.x + rect.width, rect.y + rect.height), color, thickness);
+		Util.drawRect(image, rect, color, thickness);
 	}
 
 }

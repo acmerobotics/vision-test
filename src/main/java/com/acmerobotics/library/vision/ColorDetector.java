@@ -55,7 +55,7 @@ public class ColorDetector {
 		
 	}
 	
-	public List<ColorRegion> getContours() {
+	public List<ColorRegion> getRegions() {
 		return regions;
 	}
 	

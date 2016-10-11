@@ -3,7 +3,10 @@ package com.acmerobotics.library.vision;
 import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
+import org.opencv.core.Point;
 import org.opencv.core.Rect;
+import org.opencv.core.Scalar;
+import org.opencv.imgproc.Imgproc;
 
 public class Util {
 	
@@ -25,6 +28,10 @@ public class Util {
 		int minTop = top1 < top2 ? top1 : top2;
 		int maxBottom = bottom1 > bottom2 ? bottom1 : bottom2;
 		return new Rect(minLeft, minTop, maxRight - minLeft, maxBottom - minTop);
+	}
+	
+	public static void drawRect(Mat image, Rect rect, Scalar color, int thickness) {
+		Imgproc.rectangle(image, new Point(rect.x, rect.y), new Point(rect.x + rect.width, rect.y + rect.height), color, thickness);
 	}
 
 }

@@ -35,62 +35,71 @@ public class Beacon {
 		ColorDetector redDetector = new ColorDetector(red);
 		ColorDetector blueDetector = new ColorDetector(blue);
 		
-		redDetector.analyzeImage(image);
-		blueDetector.analyzeImage(image);
+		List<ColorRegion> redRegions = findColorRegions(image, redDetector);
+		List<ColorRegion> blueRegions = findColorRegions(image, blueDetector);
+
+		Rect beacon = null;
+		List<ColorRegion> beaconRegions = new ArrayList<ColorRegion>();
+		for (ColorRegion redRegion : redRegions) {
+			List<Circle> buttons = redRegion.getButtons();
+			int numButtons = buttons.size();
+			if (numButtons == 2) {
+				beaconRegions.add(redRegion);
+				beacon = redRegion.getBounds();
+				break;
+			} else if (numButtons == 1) {
+				double bestError = Double.POSITIVE_INFINITY;
+				ColorRegion bestRegion = null;
+				Rect bestBounds = null;
+				for (ColorRegion blueRegion : blueRegions) {
+					if (blueRegion.getButtons().size() != 1) continue;
+					Rect combined = Util.combineRects(redRegion.getBounds(), blueRegion.getBounds());
+					double error = calcAspectRatioError(combined);
+					if (error < bestError) {
+						bestError = error;
+						bestRegion = blueRegion;
+						bestBounds = combined;
+					}
+				}
+				beaconRegions.add(redRegion);
+				beaconRegions.add(bestRegion);
+				beacon = bestBounds;
+				break;
+			}
+		}
 		
-		List<ColorRegion> redRegions = redDetector.getContours();
-		List<ColorRegion> blueRegions = blueDetector.getContours();
+		Imgproc.rectangle(image, new Point(0, 0), new Point(75, 30), new Scalar(255, 255, 255), -1);
+		if (beacon != null) {
+			drawRegions(image, beaconRegions, new Scalar(0, 255, 0), 2);
+			double error = calcAspectRatioError(beacon);
+			Util.drawRect(image, beacon, new Scalar(255, 255, 0), 2);
+			Imgproc.putText(image, ((int) Math.round(100 * error)) + "%", new Point(10, 25), Core.FONT_HERSHEY_SIMPLEX, 1, new Scalar(255, 255, 0), 2);
+		} else {
+			Imgproc.putText(image, "???", new Point(10, 25), Core.FONT_HERSHEY_SIMPLEX, 1, new Scalar(255, 255, 0), 2);
+		}
+	}
+	
+	private static double calcAspectRatioError(Rect beacon) {
+		double widthHeightRatio = ((double) beacon.width) / beacon.height;
+		return Math.pow(widthHeightRatio - BEACON_WH_RATIO, 2);
+	}
+	
+	public static List<ColorRegion> findColorRegions(Mat image, ColorDetector detector) {
+		detector.analyzeImage(image);
+		List<ColorRegion> regions = detector.getRegions();
 		
-		Mat gray = new Mat(), gray2 = new Mat();
+		Mat gray = new Mat();
 		Imgproc.cvtColor(image, gray, Imgproc.COLOR_BGR2GRAY);
-		Imgproc.cvtColor(image, gray2, Imgproc.COLOR_BGR2GRAY);
-		
-		redDetector.clipRegion(gray, gray);
-		blueDetector.clipRegion(gray2, gray2);
+		detector.clipRegion(gray, gray);
 		
 		Imgproc.threshold(gray, gray, 0, 255, Imgproc.THRESH_BINARY | Imgproc.THRESH_OTSU);
-		Imgproc.threshold(gray2, gray2, 0, 255, Imgproc.THRESH_BINARY | Imgproc.THRESH_OTSU);
-		
-		Mat bg = redDetector.getMask();
+		Mat bg = detector.getMask();
 		Core.bitwise_not(bg, bg);
 		Core.bitwise_or(gray, bg, gray);
 		
-		Mat bg2 = blueDetector.getMask();
-		Core.bitwise_not(bg2, bg2);
-		Core.bitwise_or(gray2, bg2, gray2);
+		addButtonsToRegions(regions, findButtons(gray));
 		
-		List<Circle> buttons = findButtons(gray);
-		List<Circle> buttons2 = findButtons(gray2);
-		
-		addButtonsToRegions(redRegions, buttons);
-		addButtonsToRegions(blueRegions, buttons2);
-	
-		double error = 1;
-		for (ColorRegion region : redRegions) {
-			int numButtons = region.getButtons().size();
-			if (numButtons == 2) {
-				Rect bounds = region.getBounds();
-				Imgproc.rectangle(image, new Point(bounds.x, bounds.y), new Point(bounds.x + bounds.width, bounds.y + bounds.height), new Scalar(255, 255, 0), 2);
-				double widthHeightRatio = ((double) bounds.width) / bounds.height;
-				error = Math.pow(widthHeightRatio - BEACON_WH_RATIO, 2);
-			} else if (numButtons == 1) {
-				error = 1;
-				Rect bestRect = null;
-				for (ColorRegion region2 : blueRegions) {
-					if (region2.getButtons().size() != 1) continue;
-					Rect combined = Util.combineRects(region.getBounds(), region2.getBounds());
-					double widthHeightRatio = ((double) combined.width) / combined.height;
-					double error2 = Math.pow(widthHeightRatio - BEACON_WH_RATIO, 2);	
-					if (error2 < error) {
-						error = error2;
-						bestRect = combined;
-					}
-				}
-				if (bestRect != null) Imgproc.rectangle(image, new Point(bestRect.x, bestRect.y), new Point(bestRect.x + bestRect.width, bestRect.y + bestRect.height), new Scalar(255, 255, 0), 2);
-			}
-		}
-		Imgproc.rectangle(image, new Point(0, 0), new Point(100, 30), new Scalar(255, 255, 255), -1);
-		Imgproc.putText(image, ((int) Math.round(100 * error)) + "%", new Point(10, 25), Core.FONT_HERSHEY_PLAIN, 2, new Scalar(255, 255, 0), 2);
+		return regions;
 	}
 	
 	protected static void addButtonsToRegions(List<ColorRegion> regions, List<Circle> buttons) {
