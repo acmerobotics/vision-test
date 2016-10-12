@@ -6,11 +6,12 @@ import java.util.List;
 import org.opencv.core.Core;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfPoint;
-import org.opencv.core.Point;
 import org.opencv.core.Rect;
 import org.opencv.core.Scalar;
 import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
+
+import com.acmerobotics.library.vision.BeaconResult.BeaconColor;
 
 public class Beacon {
 	
@@ -24,7 +25,7 @@ public class Beacon {
 	public static final double BEACON_HEIGHT = 5.7;
 	public static final double BEACON_WH_RATIO = BEACON_WIDTH / BEACON_HEIGHT;
 	
-	public static void processBeacon(Mat image) {
+	public static List<BeaconResult> processBeacon(Mat image) {
 		ScalarRange red = new ScalarRange();
 		red.add(new Scalar(150, LOWER_SAT, LOWER_VALUE), new Scalar(180, UPPER_SAT, UPPER_VALUE));
 		red.add(new Scalar(0, LOWER_SAT, LOWER_VALUE), new Scalar(20, UPPER_SAT, UPPER_VALUE));
@@ -37,49 +38,69 @@ public class Beacon {
 		
 		List<ColorRegion> redRegions = findColorRegions(image, redDetector);
 		List<ColorRegion> blueRegions = findColorRegions(image, blueDetector);
-
-		Rect beacon = null;
-		List<ColorRegion> beaconRegions = new ArrayList<ColorRegion>();
-		for (ColorRegion redRegion : redRegions) {
-			List<Circle> buttons = redRegion.getButtons();
-			int numButtons = buttons.size();
+		
+		List<BeaconResult> results = new ArrayList<BeaconResult>();
+		
+		int i = 0;
+		while (i < redRegions.size()) {
+			ColorRegion redRegion = redRegions.get(i);
+			int numButtons = redRegion.getButtons().size();
 			if (numButtons == 2) {
-				beaconRegions.add(redRegion);
-				beacon = redRegion.getBounds();
-				break;
+				results.add(new BeaconResult(BeaconColor.RED, BeaconColor.RED, redRegion, redRegion.getButtons(), redRegion.getBounds()));
+				redRegions.remove(i);
 			} else if (numButtons == 1) {
-				double bestError = Double.POSITIVE_INFINITY;
-				ColorRegion bestRegion = null;
-				Rect bestBounds = null;
-				for (ColorRegion blueRegion : blueRegions) {
-					if (blueRegion.getButtons().size() != 1) continue;
-					Rect combined = Util.combineRects(redRegion.getBounds(), blueRegion.getBounds());
-					double error = calcAspectRatioError(combined);
-					if (error < bestError) {
-						bestError = error;
-						bestRegion = blueRegion;
-						bestBounds = combined;
-					}
+				i++;
+			} else {
+				redRegions.remove(i);
+			}
+		}
+		
+		while (i < blueRegions.size()) {
+			ColorRegion blueRegion = blueRegions.get(i);
+			int numButtons = blueRegion.getButtons().size();
+			if (numButtons == 2) {
+				results.add(new BeaconResult(BeaconColor.BLUE, BeaconColor.BLUE, blueRegion, blueRegion.getButtons(), blueRegion.getBounds()));
+				blueRegions.remove(i);
+			} else if (numButtons == 1) {
+				i++;
+			} else {
+				blueRegions.remove(i);
+			}
+		}
+		
+		for (ColorRegion region : redRegions) {
+			ColorRegion bestMatch = null;
+			double bestError = 1.0;
+			Rect bestBounds = null;
+			for (ColorRegion region2 : blueRegions) {
+				Rect combined = Util.combineRects(region.getBounds(), region2.getBounds());
+				double error = calcAspectRatioError(combined);
+				if (error < bestError) {
+					bestMatch = region2;
+					bestBounds = combined;
+					bestError = error;
 				}
-				beaconRegions.add(redRegion);
-				beaconRegions.add(bestRegion);
-				beacon = bestBounds;
+			}
+			if (bestMatch != null) {
+				region.getButtons().addAll(bestMatch.getButtons());
+				if (region.getBounds().x < bestBounds.x) {
+					results.add(new BeaconResult(BeaconColor.RED, BeaconColor.BLUE, region, bestMatch, region.getButtons(), bestBounds));
+				} else {					
+					results.add(new BeaconResult(BeaconColor.BLUE, BeaconColor.RED, bestMatch, region, region.getButtons(), bestBounds));
+				}
+			} else {
 				break;
 			}
 		}
 		
-		Imgproc.rectangle(image, new Point(0, 0), new Point(75, 30), new Scalar(255, 255, 255), -1);
-		if (beacon != null) {
-			drawRegions(image, beaconRegions, new Scalar(0, 255, 0), 2);
-			double error = calcAspectRatioError(beacon);
-			Util.drawRect(image, beacon, new Scalar(255, 255, 0), 2);
-			Imgproc.putText(image, ((int) Math.round(100 * error)) + "%", new Point(10, 25), Core.FONT_HERSHEY_SIMPLEX, 1, new Scalar(255, 255, 0), 2);
-		} else {
-			Imgproc.putText(image, "???", new Point(10, 25), Core.FONT_HERSHEY_SIMPLEX, 1, new Scalar(255, 255, 0), 2);
+		for (BeaconResult result : results) {
+			result.drawBeacon(image);
 		}
+		
+		return results;
 	}
 	
-	private static double calcAspectRatioError(Rect beacon) {
+	public static double calcAspectRatioError(Rect beacon) {
 		double widthHeightRatio = ((double) beacon.width) / beacon.height;
 		return Math.pow(widthHeightRatio - BEACON_WH_RATIO, 2);
 	}
