@@ -5,6 +5,7 @@ import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 import org.opencv.core.Point;
 import org.opencv.core.Rect;
+import org.opencv.core.RotatedRect;
 import org.opencv.core.Scalar;
 import org.opencv.imgproc.Imgproc;
 
@@ -32,6 +33,14 @@ public class Util {
 	
 	public static void drawRect(Mat image, Rect rect, Scalar color, int thickness) {
 		Imgproc.rectangle(image, new Point(rect.x, rect.y), new Point(rect.x + rect.width, rect.y + rect.height), color, thickness);
+	}
+	
+	public static void drawRotatedRect(Mat image, RotatedRect rect, Scalar color, int thickness) {
+		Point[] vertices = new Point[4];
+		rect.points(vertices);
+		for (int i = 0; i < 4; i++) {
+			Imgproc.line(image, vertices[i], vertices[(i + 1) % 4], color, thickness);
+		}
 	}
 
 }
