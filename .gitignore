@@ -2,6 +2,8 @@
 .project
 .classpath
 .settings/
+.metadata/
+.recommenders/
 bin/
 
 # output images
@@ -9,3 +11,4 @@ output/
 
 # gradle
 build/
+.gradle/

@@ -39,6 +39,8 @@ eclipse {
 }
 
 dependencies {
+	compile project(':visionLib')
+	
 	compile (name: 'opencv-310', ext: 'jar')
 	
 	compile group: 'commons-cli', name: 'commons-cli', version: '1.3.1'

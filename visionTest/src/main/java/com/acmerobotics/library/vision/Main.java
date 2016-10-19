@@ -177,8 +177,8 @@ public class Main {
 			
 			String description = "";
 			description += score + " " + result.getScoreString() + "  ";
-			description += (result.getLeftRegion().getColor() == BeaconColor.RED ? "R" : "B") + ",";
-			description += result.getRightRegion().getColor() == BeaconColor.RED ? "R" : "B";
+			description += (result.getLeftRegion().getColor() == Beacon.BeaconColor.RED ? "R" : "B") + ",";
+			description += result.getRightRegion().getColor() == Beacon.BeaconColor.RED ? "R" : "B";
 			
 			double width = Imgproc.getTextSize(description, Core.FONT_HERSHEY_SIMPLEX, 1, 2, null).width;
 			Imgproc.rectangle(image, new Point(0, y), new Point(width + 20, y + 30), new Scalar(255, 255, 255), -1);
