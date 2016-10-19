@@ -7,6 +7,8 @@ import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 import org.opencv.core.Scalar;
+import org.opencv.core.Size;
+import org.opencv.imgproc.Imgproc;
 
 public class ScalarRange {
 	
@@ -55,7 +57,7 @@ public class ScalarRange {
 	
 	public Mat inRange(Mat src) {
 		Mat dest = Mat.zeros(src.size(), CvType.CV_8U);
-		Mat mask = new Mat(src.size(), CvType.CV_8U);
+		Mat mask = new Mat();
 		for (int i = 0; i < ranges.size(); i += 2) {
 			Core.inRange(src, ranges.get(i), ranges.get(i + 1), mask);
 			Core.bitwise_or(dest, mask, dest);

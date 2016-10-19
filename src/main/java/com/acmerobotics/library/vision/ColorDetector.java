@@ -6,6 +6,7 @@ import java.util.List;
 import org.opencv.core.Core;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfPoint;
+import org.opencv.core.Scalar;
 import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
 
@@ -38,15 +39,25 @@ public class ColorDetector {
 		
 		this.mask = range.inRange(hsv);
 		
-		Mat kernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(15, 15));
+		Imgproc.medianBlur(mask, mask, 5);
+		
+//		Main.writeImage(mask);
+		
+		Mat kernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(7, 7));
 		Imgproc.morphologyEx(mask, mask, Imgproc.MORPH_OPEN, kernel);
+//		Imgproc.erode(mask, mask, kernel);
+//		Main.writeImage(mask);
 		Mat kernel2 = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(25, 25));
 		Imgproc.morphologyEx(mask, mask, Imgproc.MORPH_CLOSE, kernel2);
+//		Main.writeImage(mask);
+//		Imgproc.dilate(mask, mask, kernel);
 		
-		Core.bitwise_and(gray, mask, gray);
+//		Core.bitwise_and(gray, mask, gray);
 		
+		Mat temp = new Mat();
+		mask.copyTo(temp);
 		List<MatOfPoint> contours = new ArrayList<MatOfPoint>();
-		Imgproc.findContours(gray, contours, new Mat(), Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE);
+		Imgproc.findContours(temp, contours, new Mat(), Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE);
 		
 		regions = new ArrayList<ColorRegion>();
 		for (MatOfPoint contour : contours) {

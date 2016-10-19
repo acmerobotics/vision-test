@@ -26,6 +26,10 @@ public class BeaconRegion {
 		calculateBounds();
 	}
 	
+	public double area() {
+		return Imgproc.contourArea(region.getContour());
+	}
+	
 	private void calculateBounds() {
 		MatOfPoint2f points = new MatOfPoint2f();
 		points.fromArray(region.getContour().toArray());
@@ -50,6 +54,10 @@ public class BeaconRegion {
 	
 	public RotatedRect getBounds() {
 		return this.bounds;
+	}
+	
+	public BeaconColor getColor() {
+		return this.color;
 	}
 	
 	public void draw(Mat image) {

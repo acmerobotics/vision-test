@@ -1,6 +1,10 @@
 package com.acmerobotics.library.vision;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
 
 import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.Option;
@@ -11,9 +15,13 @@ import org.apache.commons.cli.ParseException;
 import org.apache.tools.ant.DirectoryScanner;
 import org.opencv.core.Core;
 import org.opencv.core.Mat;
+import org.opencv.core.Point;
+import org.opencv.core.Scalar;
 import org.opencv.core.Size;
 import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
+
+import com.acmerobotics.library.vision.Beacon.BeaconColor;
 
 public class Main {
 	
@@ -80,26 +88,104 @@ public class Main {
 		double msTotal = 0;
 		for (File input : inputImages) {
 			if (input.isFile()) {
-				setCurrentFile(input.getPath());
+				File outputFile = new File(outputDir.getPath() + "\\" + input.getName());
+				setCurrentFile(outputFile.getPath());
 				
 				Mat original = Imgcodecs.imread(input.getPath());
 				int width = original.width(), height = original.height();
 				Mat resized = new Mat();
 				Imgproc.resize(original, resized, new Size(IMAGE_WIDTH, (height * IMAGE_WIDTH) / width));
+				
 				long start = System.currentTimeMillis();
-				BeaconAnalyzer.processBeacon(resized);
+//				analyzeColor(resized);
+				analyzeImage(resized);
 				long stop = System.currentTimeMillis();
 				msTotal += (stop - start);
-				File outputFile = new File(outputDir.getPath() + "\\" + input.getName());
+				
 				Imgcodecs.imwrite(outputFile.getPath(), resized);
+				
 				System.out.print(input.getPath() + "@" + width + "x" + height);
 				System.out.print(" => ");
 				System.out.print(outputFile.getPath() + "@" + resized.width() + "x" + resized.height());
 				System.out.println(" (" + (stop - start) + "ms)");
-				System.out.println();
 			}
 		}
 		System.out.println("mean process time: " + (int) (msTotal / inputImages.length) + "ms");
+	}
+	
+	public static void analyzeColor(Mat image) {
+		Mat hsv = new Mat(), sat = new Mat(), val = new Mat(), hue = new Mat();
+		
+		Imgproc.cvtColor(image, hsv, Imgproc.COLOR_BGR2HSV);
+		
+		Core.extractChannel(hsv, hue, 0);
+		Core.extractChannel(hsv, sat, 1);
+		Core.extractChannel(hsv, val, 2);
+		
+		ScalarRange hueRange = new ScalarRange();
+		hueRange.add(new Scalar(90, 0, 0), new Scalar(125, 255, 255));
+		
+		ScalarRange satRange = new ScalarRange();
+		satRange.add(new Scalar(0, 80, 0), new Scalar(180, 255, 255));
+		
+		ScalarRange valRange = new ScalarRange();
+		valRange.add(new Scalar(0, 0, 180), new Scalar(180, 255, 255));
+		
+		List<ScalarRange> ranges = new ArrayList<ScalarRange>();
+		ranges.add(hueRange);
+		ranges.add(satRange);
+		ranges.add(valRange);
+
+		Mat temp = new Mat();
+		for (int i = 0; i < 3; i++) {
+			ScalarRange range = ranges.get(i);
+			ColorDetector detector = new ColorDetector(range);
+			detector.analyzeImage(image);
+			List<ColorRegion> regions = detector.getRegions();
+//			image.copyTo(temp);
+//			ColorRegion.drawRegions(temp, regions, new Scalar(0, 0, 255), 2);
+			writeImage(detector.getMask());
+			Core.extractChannel(hsv, temp, i);
+			Imgproc.cvtColor(temp, temp, Imgproc.COLOR_GRAY2BGR);
+//			ColorRegion.drawRegions(temp, regions, new Scalar(0, 0, 255), 2);
+			writeImage(temp);
+		}
+	}
+	
+	public static void analyzeImage(Mat image) {
+		List<Beacon> beacons = BeaconAnalyzer.analyzeImage(image);
+		
+		int y = 0;
+		
+		Collections.sort(beacons, new Comparator<Beacon>() {
+
+			@Override
+			public int compare(Beacon o1, Beacon o2) {
+				Size s1 = o1.getBounds().size;
+				Size s2 = o2.getBounds().size;
+				double area1 = s1.width * s1.height;
+				double area2 = s2.width * s2.height;
+				return (area1 > area2) ? -1 : 1;
+			}
+			
+		});
+		
+		for (Beacon result : beacons) {
+			int score = result.score();	
+			
+			result.draw(image);
+			
+			String description = "";
+			description += score + " " + result.getScoreString() + "  ";
+			description += (result.getLeftRegion().getColor() == BeaconColor.RED ? "R" : "B") + ",";
+			description += result.getRightRegion().getColor() == BeaconColor.RED ? "R" : "B";
+			
+			double width = Imgproc.getTextSize(description, Core.FONT_HERSHEY_SIMPLEX, 1, 2, null).width;
+			Imgproc.rectangle(image, new Point(0, y), new Point(width + 20, y + 30), new Scalar(255, 255, 255), -1);
+			Imgproc.putText(image, description, new Point(10, y + 25), Core.FONT_HERSHEY_SIMPLEX, 1, new Scalar(0, 0, 0), 2);
+			
+			y += 30;
+		}
 	}
 	
 	public static void setCurrentFile(String filename) {
@@ -109,7 +195,7 @@ public class Main {
 	
 	public static int writeImage(Mat image) {
 		String[] parts = currentFile.split("\\.");
-		Imgcodecs.imwrite(parts[0].replaceAll("images", "output") + "_" + (++currentFileIndex) + "." + parts[1], image);
+		Imgcodecs.imwrite(parts[0] + "_" + (++currentFileIndex) + "." + parts[1], image);
 		return currentFileIndex;
 	}
 	

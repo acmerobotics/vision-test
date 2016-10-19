@@ -1,14 +1,12 @@
 package com.acmerobotics.library.vision;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 
 import org.opencv.core.Core;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfPoint;
 import org.opencv.core.MatOfPoint2f;
-import org.opencv.core.Point;
 import org.opencv.core.Rect;
 import org.opencv.core.RotatedRect;
 import org.opencv.core.Scalar;
@@ -19,147 +17,67 @@ import com.acmerobotics.library.vision.Beacon.BeaconColor;
 
 public class BeaconAnalyzer {
 	
-	public static final int LOWER_SAT = 0;
-	public static final int UPPER_SAT = 255;
-	
-	public static final int LOWER_VALUE = 160;
-	public static final int UPPER_VALUE = 255;
-	
-	public enum ButtonAnalysisMethod {
+	public enum ButtonDetectionMethod {
 		BUTTON_HOUGH,
 		BUTTON_ELLIPSE
 	}
 	
-	public static List<Beacon> processBeacon(Mat image) {
+	public static List<Beacon> analyzeImage(Mat image) {
+		return analyzeImage(image, ButtonDetectionMethod.BUTTON_ELLIPSE);
+	}
+	
+	public static List<Beacon> analyzeImage(Mat image, ButtonDetectionMethod buttonMethod) {
 		ScalarRange red = new ScalarRange();
-		red.add(new Scalar(150, LOWER_SAT, LOWER_VALUE), new Scalar(180, UPPER_SAT, UPPER_VALUE));
-		red.add(new Scalar(0, LOWER_SAT, LOWER_VALUE), new Scalar(10, UPPER_SAT, UPPER_VALUE));
+		red.add(new Scalar(155, 0, 160), new Scalar(180, 255, 255));
+		red.add(new Scalar(0, 0, 160), new Scalar(2, 255, 255));
 		
 		ScalarRange blue = new ScalarRange();
-		blue.add(new Scalar(90, LOWER_SAT, LOWER_VALUE), new Scalar(125, UPPER_SAT, UPPER_VALUE));
-		
-		Mat hsv = new Mat();
-		Imgproc.cvtColor(image, hsv, Imgproc.COLOR_BGR2HSV);
-		
-		Mat gray = new Mat();
-		Imgproc.cvtColor(image, gray, Imgproc.COLOR_BGR2GRAY);
-		
-		Mat hue = new Mat(), sat = new Mat(), val = new Mat(), mask = new Mat();
-		Core.extractChannel(hsv, hue, 0);
-		Core.extractChannel(hsv, sat, 1);
-		Core.extractChannel(hsv, val, 2);
-		
-		ScalarRange hueRange = new ScalarRange();
-		hueRange.add(new Scalar(150), new Scalar(180));
-		hueRange.add(new Scalar(0), new Scalar(10));
-//		hueRange.add(new Scalar(90), new Scalar(125));
-		mask = hueRange.inRange(hue);
-		Core.bitwise_and(hue, mask, hue);
-		
-		Core.inRange(sat, new Scalar(LOWER_SAT), new Scalar(UPPER_SAT), mask);
-		mask.copyTo(sat);
-//		Core.bitwise_and(mask, sat, sat);
-		
-		Core.inRange(val, new Scalar(LOWER_VALUE), new Scalar(UPPER_VALUE), mask);
-		mask.copyTo(val);
-//		Core.bitwise_and(mask, val, val);
-		
-//		Main.writeImage(hue);
-//		Main.writeImage(sat);
-//		Main.writeImage(val);
+		blue.add(new Scalar(90, 40, 180), new Scalar(125, 255, 255));
 		
 		ColorDetector redDetector = new ColorDetector(red);
 		ColorDetector blueDetector = new ColorDetector(blue);
 		
-		List<BeaconRegion> redRegions = findBeaconRegions(image, redDetector, BeaconColor.RED, ButtonAnalysisMethod.BUTTON_ELLIPSE);
-		List<BeaconRegion> blueRegions = findBeaconRegions(image, blueDetector, BeaconColor.BLUE, ButtonAnalysisMethod.BUTTON_ELLIPSE);
+		List<BeaconRegion> redRegions = findBeaconRegions(image, redDetector, BeaconColor.RED, buttonMethod);
+		List<BeaconRegion> blueRegions = findBeaconRegions(image, blueDetector, BeaconColor.BLUE, buttonMethod);
 		
 		BeaconRegion.drawRegions(image, redRegions);
 		BeaconRegion.drawRegions(image, blueRegions);
 		
-		List<Beacon> results = new ArrayList<Beacon>();
+		List<BeaconRegion> allRegions = new ArrayList<BeaconRegion>();
+		allRegions.addAll(redRegions);
+		allRegions.addAll(blueRegions);
 		
-		int i = 0;
-		while (i < redRegions.size()) {
-			BeaconRegion redRegion = redRegions.get(i);
-			int numButtons = redRegion.getButtons().size();
-			System.out.println("found region with " + numButtons + " button(s)");
-			if (numButtons == 2) {
-				results.add(new Beacon(redRegion));
-				redRegions.remove(i);
-			} else if (numButtons == 1 || numButtons == 0) {
-				i++;
-			} else {
-				redRegions.remove(i);
-			}
-		}
-		
-		while (i < blueRegions.size()) {
-			BeaconRegion blueRegion = blueRegions.get(i);
-			int numButtons = blueRegion.getButtons().size();
-			if (numButtons == 2) {
-				results.add(new Beacon(blueRegion));
-				blueRegions.remove(i);
-			} else if (numButtons == 1) {
-				i++;
-			} else {
-				blueRegions.remove(i);
-			}
-		}
-		
-		for (BeaconRegion region : redRegions) {
-			Beacon bestMatch = null;
-			double bestError = 1.0;
-			for (BeaconRegion region2 : blueRegions) {
-				Beacon combined = new Beacon(region, region2);
-				double error = combined.getAspectRatioError();
-				if (error < bestError) {
-					bestMatch = combined;
-					bestError = error;
+		List<Beacon> beacons = new ArrayList<Beacon>();
+		int numRegions = allRegions.size();
+		for (int i = 0; i < numRegions; i++) {
+			BeaconRegion region1 = allRegions.get(i);
+			for (int j = 0; j <= i; j++) {
+				BeaconRegion region2 = allRegions.get(j);
+				Beacon newBeacon;
+				if (region1.equals(region2)) {
+					newBeacon = new Beacon(region1);
+				} else {
+					newBeacon = new Beacon(region1, region2);
 				}
+				if (newBeacon.score() >= 6) beacons.add(newBeacon);
 			}
-			results.add(bestMatch);
 		}
 		
-		Imgproc.rectangle(image, new Point(0, 0), new Point(75, 30 * results.size()), new Scalar(255, 255, 255), -1);
-		int y = 25;
-		
-		results.sort(new Comparator<Beacon>() {
-
-			@Override
-			public int compare(Beacon o1, Beacon o2) {
-				Size s1 = o1.getBounds().size;
-				Size s2 = o2.getBounds().size;
-				double area1 = s1.width * s1.height;
-				double area2 = s2.width * s2.height;
-				return (area1 > area2) ? 1 : -1;
-			}
-			
-		});
-		
-		for (Beacon result : results) {
-			result.draw(image);
-			
-			double error = result.getAspectRatioError();
-			Imgproc.putText(image, ((int) Math.round(100 * error)) + "%", new Point(10, y), Core.FONT_HERSHEY_SIMPLEX, 1, new Scalar(0, 0, 0), 2);
-			y += 30;
-		}
-		
-		return results;
+		return beacons;
 	}
 	
-	public static List<BeaconRegion> findBeaconRegions(Mat image, ColorDetector detector, BeaconColor color, ButtonAnalysisMethod method) {
+	public static List<BeaconRegion> findBeaconRegions(Mat image, ColorDetector detector, BeaconColor color, ButtonDetectionMethod method) {
 		detector.analyzeImage(image);
+//		Main.writeImage(detector.getMask());
 		List<ColorRegion> regions = detector.getRegions();
 		
 		Mat gray = new Mat();
 		Imgproc.cvtColor(image, gray, Imgproc.COLOR_BGR2GRAY);
 		detector.clipRegion(gray, gray);
 		
-		Imgproc.threshold(gray, gray, 0, 255, Imgproc.THRESH_BINARY | Imgproc.THRESH_OTSU);
+		Imgproc.threshold(gray, gray, 0, 255, Imgproc.THRESH_BINARY_INV | Imgproc.THRESH_OTSU);
 		Mat bg = detector.getMask();
-		Core.bitwise_not(bg, bg);
-		Core.bitwise_or(gray, bg, gray);
+		Core.bitwise_and(gray, bg, gray);
 		
 		List<Circle> buttons = findButtons(gray, method);
 		
@@ -174,13 +92,13 @@ public class BeaconAnalyzer {
 		return beaconRegions;
 	}
 	
-	public static List<Circle> findButtons(Mat gray, ButtonAnalysisMethod method) {
-		if (method == ButtonAnalysisMethod.BUTTON_HOUGH) {
+	public static List<Circle> findButtons(Mat gray, ButtonDetectionMethod method) {
+		if (method == ButtonDetectionMethod.BUTTON_HOUGH) {
 			return findButtonsHough(gray);
-		} else if (method == ButtonAnalysisMethod.BUTTON_ELLIPSE) {
+		} else if (method == ButtonDetectionMethod.BUTTON_ELLIPSE) {
 			return findButtonsEllipse(gray);
 		} else {
-			return null;
+			throw new RuntimeException("unknown button detection method: " + method.toString());
 		}
 	}
 	
@@ -205,22 +123,36 @@ public class BeaconAnalyzer {
 		List<Circle> circles = new ArrayList<Circle>();
 		
 		Mat edges = new Mat();
-		Mat kernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(5, 5));
-		Imgproc.morphologyEx(gray, edges, Imgproc.MORPH_CLOSE, kernel);
-		Imgproc.Canny(edges, edges, 200, 100);
+		// don't morphologically open unless there are enough white pixels
+		if (Core.countNonZero(gray) > 150) {
+			Mat kernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(7, 7));
+			Imgproc.morphologyEx(gray, gray, Imgproc.MORPH_OPEN, kernel);
+			Imgproc.GaussianBlur(gray, gray, new Size(5, 5), 2);
+		}
 		
+		Imgproc.Canny(gray, edges, 200, 100);
+
 		List<MatOfPoint> contours = new ArrayList<MatOfPoint>();
 		Imgproc.findContours(edges, contours, new Mat(), Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE);
 		
 		for (MatOfPoint contour : contours) {
+			// at least 5 points are needed to fit an ellipse
+			if (contour.rows() < 5) {
+				continue;
+			}
+			
 			Rect boundingRect = Imgproc.boundingRect(contour);
 			double eccentricity = ((double) boundingRect.width) / boundingRect.height;
-			if (Math.abs(eccentricity - 1) <= 0.25) {
+			
+			if (Math.abs(eccentricity - 1) <= 0.3) {
 				MatOfPoint2f ellipseContour = new MatOfPoint2f();
 				ellipseContour.fromArray(contour.toArray());
-				System.out.println("attempting to find ellipse with " + contour.toArray().length + " point(s)");
 				RotatedRect ellipse = Imgproc.fitEllipse(ellipseContour);
-				circles.add(new Circle(ellipse.center, (int) Math.round((ellipse.size.width + ellipse.size.height) / 4)));
+				// convert the ellipse into a circle
+				double fittedRadius = (ellipse.size.width + ellipse.size.height) / 4;
+				if (fittedRadius > 2) {
+					circles.add(new Circle(ellipse.center, (int) (fittedRadius + 0.5)));
+				}
 			}
 		}
 		
