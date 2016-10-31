@@ -22,6 +22,9 @@ import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
 
 import com.acmerobotics.library.vision.Beacon.BeaconColor;
+import com.acmerobotics.library.vision.Beacon.Score;
+import com.acmerobotics.library.vision.BeaconAnalyzer.ButtonDetectionMethod;
+import com.acmerobotics.library.vision.ImageOverlay.ImageRegion;
 
 public class Main {
 	
@@ -141,7 +144,7 @@ public class Main {
 			ScalarRange range = ranges.get(i);
 			ColorDetector detector = new ColorDetector(range);
 			detector.analyzeImage(image);
-			List<ColorRegion> regions = detector.getRegions();
+//			List<ColorRegion> regions = detector.getRegions();
 //			image.copyTo(temp);
 //			ColorRegion.drawRegions(temp, regions, new Scalar(0, 0, 255), 2);
 			writeImage(detector.getMask());
@@ -154,8 +157,6 @@ public class Main {
 	
 	public static void analyzeImage(Mat image) {
 		List<Beacon> beacons = BeaconAnalyzer.analyzeImage(image);
-		
-		int y = 0;
 		
 		Collections.sort(beacons, new Comparator<Beacon>() {
 
@@ -170,21 +171,20 @@ public class Main {
 			
 		});
 		
+		ImageOverlay overlay = new ImageOverlay(image);
+		overlay.setBackgroundColor(new Scalar(0, 0, 0));
+		
 		for (Beacon result : beacons) {
-			int score = result.score();	
+			Score score = result.getScore();
 			
 			result.draw(image);
 			
 			String description = "";
-			description += score + " " + result.getScoreString() + "  ";
+			description += score.getNumericScore() + " " + score.toString() + "  ";
 			description += (result.getLeftRegion().getColor() == Beacon.BeaconColor.RED ? "R" : "B") + ",";
 			description += result.getRightRegion().getColor() == Beacon.BeaconColor.RED ? "R" : "B";
 			
-			double width = Imgproc.getTextSize(description, Core.FONT_HERSHEY_SIMPLEX, 1, 2, null).width;
-			Imgproc.rectangle(image, new Point(0, y), new Point(width + 20, y + 30), new Scalar(255, 255, 255), -1);
-			Imgproc.putText(image, description, new Point(10, y + 25), Core.FONT_HERSHEY_SIMPLEX, 1, new Scalar(0, 0, 0), 2);
-			
-			y += 30;
+			overlay.drawText(description, ImageRegion.TOP_LEFT, Core.FONT_HERSHEY_SIMPLEX, 0.15, new Scalar(255, 255, 255), 3);
 		}
 	}
 	
