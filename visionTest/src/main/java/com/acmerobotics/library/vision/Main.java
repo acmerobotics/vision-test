@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.Option;
@@ -107,6 +108,13 @@ public class Main {
 				
 				Imgcodecs.imwrite(outputFile.getPath(), resized);
 				
+				if (BeaconAnalyzer.DEBUG) {
+					Set<String> outputs = BeaconAnalyzer.intermediates.keySet();
+					for (String output : outputs) {
+						Imgcodecs.imwrite(outputDir.getPath() + "\\" + input.getName().split("\\.")[0] + "_" + output + ".jpg", BeaconAnalyzer.intermediates.get(output));
+					}
+				}
+				
 				System.out.print(input.getPath() + "@" + width + "x" + height);
 				System.out.print(" => ");
 				System.out.print(outputFile.getPath() + "@" + resized.width() + "x" + resized.height());
@@ -156,7 +164,8 @@ public class Main {
 	}
 	
 	public static void analyzeImage(Mat image) {
-		List<Beacon> beacons = BeaconAnalyzer.analyzeImage(image);
+		List<Beacon> beacons = new ArrayList<Beacon>();
+		BeaconAnalyzer.analyzeImage(image, beacons);
 		
 		Collections.sort(beacons, new Comparator<Beacon>() {
 
